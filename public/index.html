@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Simulador CX</title>
+<link rel="stylesheet" href="/css/style.css">
+<script src="/vendor/chart.js/chart.min.js"></script>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🧪 Dashboard <span>Simulador CX (Dimensionamento)</span></h1>
+    <div class="update-info" id="statusHeader">Simule cenários de demanda cruzados com perdas exatas e genéricas de agentes.</div>
+  </div>
+  <div class="header-right">
+    <button class="btn" id="btnReset" style="background: var(--preto-3); border: 1px solid var(--cinza); color: var(--branco);">↺ Resetar Simulador</button>
+  </div>
+</div>
+
+<div class="nav-tabs">
+  <button class="tab-btn active" data-tab="Demanda">1. Demanda &amp; Capacidade</button>
+  <button class="tab-btn" data-tab="Resultados">2. Resultados &amp; Impacto</button>
+</div>
+
+<!-- KPIs GERAIS -->
+<div class="stats-row" id="kpisSimulador">
+  <div class="stat-card">
+    <div class="stat-label">Volume Médio (Base Diária) <div class="tooltip-icon" data-tooltip="Média de volume recebido na base selecionada.">i</div></div>
+    <div class="stat-val"><span id="kpiVolBase">0</span> <span class="stat-diff diff-neutral" id="kpiVolDiff">-</span></div>
+    <div class="stat-sub">Simulado: <b id="kpiVolSimulado">0</b></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">SLA Estimado (Simulado)</div>
+    <div class="stat-val"><span id="kpiSlaSimulado" style="color: var(--branco);">0%</span></div>
+    <div class="stat-sub" id="kpiSlaAlvo">SLA Alvo: -</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Força de Trabalho Líquida <div class="tooltip-icon" data-tooltip="Headcount real que irá produzir após o desconto dos agentes ausentes e perdas genéricas.">i</div></div>
+    <div class="stat-val"><span id="kpiHcSimulado" style="color: var(--azul);">0</span> <span class="stat-diff diff-neutral" id="kpiHcDiff">-</span></div>
+    <div class="stat-sub">Escalados Base: <b id="kpiHcBase">0</b></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Backlog Gerado (Diário)</div>
+    <div class="stat-val"><span id="kpiBacklogBase" style="color: var(--branco);">0</span> <span class="stat-diff diff-neutral" id="kpiBacklogDiff">-</span></div>
+    <div class="stat-sub">Tickets pendentes ao final do dia</div>
+  </div>
+</div>
+
+<!-- ABA 1: DEMANDA E CENÁRIOS -->
+<div class="tab-content active" id="tabDemanda">
+  <div class="sim-layout">
+
+    <div class="sim-controls-panel">
+
+      <div class="sim-group">
+        <div class="section-title" style="font-size:14px; margin-bottom:15px; border:none; padding:0;">📅 Base de Referência</div>
+
+        <div class="sim-label">Período Histórico (Média Demanda)</div>
+        <select id="simPeriodo" class="search-input" style="margin-bottom: 12px;">
+          <option value="1">Último Mês</option>
+          <option value="3" selected>Últimos 3 Meses</option>
+          <option value="6">Últimos 6 Meses</option>
+        </select>
+
+        <div class="sim-label">Filtro de Coordenação / Equipa</div>
+        <div class="custom-dropdown" id="teamDropdown" style="margin-bottom: 12px; width: 100%;">
+          <div class="dropdown-select" id="teamDropdownToggle">
+            <span id="dropdownText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">A Carregar...</span>
+            <span>▼</span>
+          </div>
+          <div class="dropdown-list" id="dropdownList"></div>
+        </div>
+      </div>
+
+      <div class="section-title" style="font-size:14px; margin-bottom:15px; border:none; padding:0; margin-top: 20px;">🎛️ Controles de Cenário</div>
+
+      <div class="sim-group">
+        <div class="sim-label">
+          Pico de Volumetria (Demanda)
+          <div class="tooltip-icon" data-tooltip="Aumenta ou reduz o volume global simulado em %.">i</div>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="simVolumetria" min="-50" max="300" value="0">
+          <div class="slider-val-badge" id="val_simVolumetria">0%</div>
+        </div>
+      </div>
+
+      <!-- PAINEL DE CAPACIDADE -->
+      <div class="sim-group" style="background: var(--preto-4); padding: 12px; border-radius: 8px; border: 1px solid var(--cinza);">
+
+        <div class="sim-label" style="border-bottom: 1px solid var(--cinza); padding-bottom: 8px; margin-bottom: 10px;">
+          Capacidade Base (Input Manual)
+          <div class="tooltip-icon" data-tooltip="Número base de agentes disponíveis antes de quaisquer descontos.">i</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px; margin-bottom: 16px;">
+          <span style="font-size:11px; color:var(--branco-2);">Total de Agentes (Gross HC)</span>
+          <input type="number" id="simHcBase" min="0" value="50" class="search-input" style="text-align:center; font-weight:bold; color:var(--azul); font-size: 16px;">
+        </div>
+
+        <div class="sim-label" style="border-bottom: 1px solid var(--cinza); padding-bottom: 8px; margin-bottom: 10px;">
+          Agentes Ausentes / Off-line (Específicos)
+          <div class="tooltip-icon" data-tooltip="A matriz subtrai exatamente as horas em que estes agentes estariam a trabalhar, criando buracos reais na capacidade horária.">i</div>
+        </div>
+        <div class="custom-dropdown" id="agentDropdown" style="width: 100%; margin-bottom: 16px;">
+          <div class="dropdown-select" id="agentDropdownToggle" style="background: var(--preto-3);">
+            <span id="agentDropdownText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Nenhum agente ausente</span>
+            <span>▼</span>
+          </div>
+          <div class="dropdown-list" id="agentList" style="padding-top: 5px;">
+             <div style="padding: 5px 10px; position: sticky; top: 0; background: var(--preto-3); z-index: 2;">
+                <input type="text" id="searchAgentInput" class="search-input" placeholder="Pesquisar por nome..." style="width: 100%;">
+             </div>
+             <div id="agentItemsContainer"></div>
+          </div>
+        </div>
+
+        <div class="sim-label" style="border-bottom: 1px solid var(--cinza); padding-bottom: 8px; margin-bottom: 10px;">
+          Perdas Genéricas de Capacidade (Avulso)
+          <div class="tooltip-icon" data-tooltip="Redução geral em números de agentes, que afeta a capacidade líquida de forma proporcional a todo o dia.">i</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+           <div style="display:flex; flex-direction:column; gap:4px;">
+             <span style="font-size:11px; color:var(--branco-2);">🏖️ Férias</span>
+             <input type="number" id="simFerias" min="0" value="0" class="search-input" style="text-align:center; font-weight:bold; color:var(--laranja);">
+           </div>
+
+           <div style="display:flex; flex-direction:column; gap:4px;">
+             <span style="font-size:11px; color:var(--branco-2);">🤧 Atestados</span>
+             <input type="number" id="simAtestados" min="0" value="0" class="search-input" style="text-align:center; font-weight:bold; color:var(--laranja);">
+           </div>
+
+           <div style="display:flex; flex-direction:column; gap:4px;">
+             <span style="font-size:11px; color:var(--branco-2);">🏥 Afastamentos</span>
+             <input type="number" id="simAfastamentos" min="0" value="0" class="search-input" style="text-align:center; font-weight:bold; color:var(--laranja);">
+           </div>
+
+           <div style="display:flex; flex-direction:column; gap:4px;">
+             <span style="font-size:11px; color:var(--branco-2);">🚫 Faltas (Abs)</span>
+             <input type="number" id="simFaltas" min="0" value="0" class="search-input" style="text-align:center; font-weight:bold; color:var(--laranja);">
+           </div>
+        </div>
+      </div>
+
+      <div class="section-title" style="font-size:14px; margin-bottom:15px; border:none; padding:0;">🔀 Regras de Roteamento</div>
+
+      <div class="sim-group">
+        <div class="sim-label">
+          Migração Async ➔ Sync
+          <div class="tooltip-icon" data-tooltip="Transfere % da carga de E-mail para a fila de Chat.">i</div>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="simMigracaoCanal" min="0" max="100" value="0">
+          <div class="slider-val-badge" id="val_simMigracaoCanal">0%</div>
+        </div>
+      </div>
+
+      <button class="btn btn-simular" id="btnRun1" disabled>⏳ Aguarde, A Carregar...</button>
+    </div>
+
+    <div class="section" style="margin-bottom:0;">
+      <div class="section-title">📉 Projeção de Fila vs Capacidade (Cenário Simulado - Média Diária)</div>
+      <div class="chart-wrap" style="height: 400px;">
+        <canvas id="canvasSimDemanda"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ABA 2: RESULTADOS E IMPACTO -->
+<div class="tab-content" id="tabResultados">
+
+  <div class="section">
+    <div class="section-title">
+      ⚖️ Quadro de Delta por Hora (Alocado vs Necessário)
+      <div class="tooltip-icon" data-tooltip="Diferença exata entre a Capacidade Líquida Simples e a Necessidade Calculada por Hora. (Verde = Sobra | Vermelho = Falta)">i</div>
+    </div>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="matrix-table" id="heatmapDeltaSimulado"></table>
+    </div>
+  </div>
+
+  <div class="cards-grid">
+    <div class="section">
+      <div class="section-title">💸 Impacto Financeiro (OpEx Estimado)</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Métrica</th>
+              <th style="text-align:right;">Custo Calculado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Custo Equipa Interna (HE) - p/ zerar fila</td>
+              <td style="text-align:right; font-weight:bold; color:var(--vermelho);" id="tbl_custoHe">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">⏳ Impacto na Fila (Backlog Médio Diário)</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Métrica</th>
+              <th style="text-align:right;">Resultado Simulado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Backlog Pendente (Tickets)</td>
+              <td style="text-align:right; font-weight:bold; color:var(--laranja);" id="tbl_backlogTck">0</td>
+            </tr>
+            <tr>
+              <td>Esforço p/ Zerar a Fila</td>
+              <td style="text-align:right;" id="tbl_horasZerar">0 horas</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
